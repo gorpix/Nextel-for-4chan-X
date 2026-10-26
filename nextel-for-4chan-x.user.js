@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         4chan X Nextel Reply Notifier
 // @namespace    local.codex.4chanx.nextel-reply-notifier
-// @version      1.0.1
+// @version      1.1.0-alpha
 // @description  Plays a cleaned classic Nextel chirp when 4chan X marks a new post as quoting you.
 // @author       gorpix
 // @homepageURL  https://github.com/gorpix/Nextel-for-4chan-X
@@ -46,6 +46,18 @@
     notificationTimer = setTimeout(playChirp, 120);
   }
 
+  // Mirror 4chan X's own beep rules: only real thread posts (not hover previews
+  // or inlined clones, whose IDs get a prefix), not hidden/filtered, not yours.
+  function isRealThreadPost(post) {
+    return /^pc\d+$/.test(post.id) && !post.closest('#qp, .inline, .dialog');
+  }
+
+  function isHidden(post) {
+    return post.hidden ||
+      post.classList.contains('post-hidden') ||
+      !!post.querySelector(':scope > .stub');
+  }
+
   function evaluatePost(post) {
     if (!(post instanceof Element) || !post.matches('.postContainer')) return;
 
@@ -54,7 +66,10 @@
       !id ||
       !eligiblePosts.has(id) ||
       completedPosts.has(id) ||
-      !post.classList.contains('quotesYou')
+      !post.classList.contains('quotesYou') ||
+      post.classList.contains('yourPost') ||
+      !isRealThreadPost(post) ||
+      isHidden(post)
     ) return;
 
     completedPosts.add(id);
