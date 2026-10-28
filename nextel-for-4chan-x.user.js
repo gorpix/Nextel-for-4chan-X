@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         4chan X Nextel Reply Notifier
 // @namespace    local.codex.4chanx.nextel-reply-notifier
-// @version      1.1.0-alpha
+// @version      1.1
 // @description  Plays a cleaned classic Nextel chirp when 4chan X marks a new post as quoting you.
 // @author       gorpix
 // @homepageURL  https://github.com/gorpix/Nextel-for-4chan-X
@@ -41,9 +41,17 @@
     }
   }
 
-  function queueNotification() {
+  let pendingPosts = [];
+
+  // Re-check right before playing, in case a post was hidden after it was inserted.
+  function queueNotification(post) {
+    pendingPosts.push(post);
     clearTimeout(notificationTimer);
-    notificationTimer = setTimeout(playChirp, 120);
+    notificationTimer = setTimeout(function () {
+      const audible = pendingPosts.some(function (p) { return p.isConnected && !isHidden(p); });
+      pendingPosts = [];
+      if (audible) playChirp();
+    }, 120);
   }
 
   // Mirror 4chan X's own beep rules: only real thread posts (not hover previews
@@ -52,10 +60,14 @@
     return /^pc\d+$/.test(post.id) && !post.closest('#qp, .inline, .dialog');
   }
 
+  // Hidden/filtered posts are either `hidden` or get a leading .stub that CSS uses to
+  // hide the post body. Also treat anything not actually rendered as hidden.
   function isHidden(post) {
+    const body = post.querySelector('.post') || post;
     return post.hidden ||
-      post.classList.contains('post-hidden') ||
-      !!post.querySelector(':scope > .stub');
+      !!post.querySelector(':scope > .stub') ||
+      post.getClientRects().length === 0 ||
+      body.getClientRects().length === 0;
   }
 
   function evaluatePost(post) {
@@ -77,7 +89,7 @@
     clearTimeout(expiryTimers.get(id));
     expiryTimers.delete(id);
 
-    if (document.hidden || !document.hasFocus()) queueNotification();
+    if (document.hidden || !document.hasFocus()) queueNotification(post);
   }
 
   function registerPost(post) {
